@@ -1,0 +1,46 @@
+
+services:
+  api:
+    build: .
+    container_name: api-tarefas
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: tarefas_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tarefas-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: banco-tarefas
+    environment:
+      POSTGRES_DB: tarefas_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tarefas_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - tarefas-network
+
+volumes:
+  postgres_data:
+
+networks:
+  tarefas-network:
+    driver: bridge

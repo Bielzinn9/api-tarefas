@@ -1,21 +1,21 @@
 
-# Utiliza uma imagem oficial do Node.js
+# Imagem oficial do Node.js
 FROM node:22-alpine
 
-# Define a pasta de trabalho
+# Diretório de trabalho
 WORKDIR /app
 
-# Copia os arquivos de dependências
+# Copiar arquivos de dependências
 COPY package*.json ./
 
-# Instala somente as dependências necessárias
+# Instalar dependências de produção
 RUN npm ci --omit=dev
 
-# Copia o código da aplicação
+# Copiar código da aplicação
 COPY src ./src
 
-# Informa a porta utilizada pela API
+# Porta da API
 EXPOSE 3000
 
-# Inicia a aplicação
+# Iniciar servidor
 CMD ["npm", "start"]
