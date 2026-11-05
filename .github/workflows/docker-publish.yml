@@ -1,0 +1,87 @@
+
+name: Publicar API de Tarefas no Docker Hub
+
+on:
+  push:
+    branches:
+      - atividade-3
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: api-tarefas-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar codigo do repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Executar testes
+        run: npm test
+
+      - name: Calcular versao SemVer
+        id: version
+        shell: bash
+        run: |
+          git fetch --tags origin
+
+          LAST_TAG=$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)
+
+          if [ -z "$LAST_TAG" ]; then
+            VERSION="1.0.0"
+          else
+            VERSION="${LAST_TAG#v}"
+
+            if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Tag SemVer invalida: $LAST_TAG"
+              exit 1
+            fi
+
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+            PATCH=$((PATCH + 1))
+            VERSION="$MAJOR.$MINOR.$PATCH"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Nova versao: $VERSION"
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login no Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Construir e publicar imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            gabcreu/api-tarefas:${{ steps.version.outputs.version }}
+            gabcreu/api-tarefas:latest
+
+      - name: Criar tag Git da versao
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
